@@ -5,3 +5,5 @@ src/gatsby-types.d.ts
 .idea/
 **/.DS_Store
 DS_Store
+.env
+*.env.*

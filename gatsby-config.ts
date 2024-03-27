@@ -1,5 +1,8 @@
 import type { GatsbyConfig } from "gatsby";
 
+if (process.env.NODE_ENV !== "production") {
+    require("dotenv").config();
+}
 const config: GatsbyConfig = {
     siteMetadata: {
         title: `wm-portfolio`,
