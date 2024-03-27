@@ -1,4 +1,4 @@
-import { graphql, HeadFC, navigate, PageProps } from "gatsby";
+import { graphql, navigate, PageProps } from "gatsby";
 import React from "react";
 import { Layout } from "./Layout";
 import {
@@ -82,6 +82,9 @@ export const query = graphql`
                         url
                     }
                     filename
+                }
+                ... on ContentfulLinkWithIcon {
+                    ...LinkWithIconComponent
                 }
             }
         }

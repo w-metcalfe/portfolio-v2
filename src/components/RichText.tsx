@@ -8,8 +8,10 @@ import {
     RenderNode,
     documentToReactComponents,
     Options,
+    CommonNode,
 } from "@contentful/rich-text-react-renderer";
-import React from "react";
+import React, { Key } from "react";
+import { v4 as uuidv4 } from "uuid";
 import {
     Box,
     Heading,
@@ -21,10 +23,14 @@ import {
     Image,
     useColorModeValue,
 } from "@chakra-ui/react";
+import { LinkWithIcon } from "./LinkWithIcon";
+
+function createUniqueId(): Key {
+    return `rich-text-id-${uuidv4()}`;
+}
 
 const defaultNodeRenderers: RenderNode = {
     [BLOCKS.PARAGRAPH]: (node, children) => {
-        // console.log("Children: ", children);
         const processedChildren = (children as React.ReactNode[])?.flatMap(
             (child) => {
                 if (typeof child === "string") {
@@ -33,7 +39,7 @@ const defaultNodeRenderers: RenderNode = {
                     // Convert array of strings to array of strings and <br />, removing the last <br />
                     return parts.flatMap((part, index) =>
                         index < parts.length - 1
-                            ? [part, <br key={index} />]
+                            ? [part, <br key={createUniqueId()} />]
                             : part,
                     );
                 }
@@ -41,67 +47,46 @@ const defaultNodeRenderers: RenderNode = {
                 return child;
             },
         );
-
-        // if (
-        //     typeof children === "string" ||
-        //     ((children as React.ReactNode[]).length === 1 &&
-        //         (children as React.ReactNode[])[0] === "")
-        // ) {
-        //     return <></>;
-        //     // return <Text mb={4}>&nbsp;</Text>;
-        // }
-        // if (children == null) return <></>;
-        // // @ts-ignore
-        // if (typeof children[0] === "object") {
-        //     if (
-        //         // @ts-ignore
-        //         children[0].props.children === "\n" ||
-        //         // @ts-ignore
-        //         children[0].props.children.trim() === ""
-        //     ) {
-        //         return <br />;
-        //     }
-        // }
-        // console.log("Returning Default");
         return (
-            <Text mb={4} textStyle={"p"}>
+            <Text mb={4} textStyle={"p"} key={createUniqueId()}>
                 {processedChildren}
             </Text>
         );
     },
     [BLOCKS.HEADING_1]: (node, children) => (
-        <Heading as="h1" size="xl" mb={4}>
+        <Heading as="h1" size="xl" mb={4} key={createUniqueId()}>
             {children}
         </Heading>
     ),
     [BLOCKS.HEADING_2]: (node, children) => (
-        <Heading as="h2" size="lg" mb={4}>
+        <Heading as="h2" size="lg" mb={4} key={createUniqueId()}>
             {children}
         </Heading>
     ),
     [BLOCKS.HEADING_3]: (node, children) => (
-        <Heading as="h3" size="md" mb={4}>
+        <Heading as="h3" size="md" mb={4} key={createUniqueId()}>
             {children}
         </Heading>
     ),
     [BLOCKS.HEADING_4]: (node, children) => (
-        <Heading as="h4" size="sm" mb={4}>
+        <Heading as="h4" size="sm" mb={4} key={createUniqueId()}>
             {children}
         </Heading>
     ),
     [BLOCKS.HEADING_5]: (node, children) => (
-        <Heading as="h5" size="xs" mb={4}>
+        <Heading as="h5" size="xs" mb={4} key={createUniqueId()}>
             {children}
         </Heading>
     ),
     [BLOCKS.HEADING_6]: (node, children) => (
-        <Heading as="h6" mb={4}>
+        <Heading as="h6" mb={4} key={createUniqueId()}>
             {children}
         </Heading>
     ),
     [BLOCKS.UL_LIST]: (node, children) => {
         return (
             <UnorderedList
+                key={createUniqueId()}
                 display={"flex"}
                 flexWrap={"wrap"}
                 columnGap={"40px"}
@@ -113,11 +98,14 @@ const defaultNodeRenderers: RenderNode = {
         );
     },
     [BLOCKS.OL_LIST]: (node, children) => (
-        <OrderedList mb={4}>{children}</OrderedList>
+        <OrderedList mb={4} key={createUniqueId()}>
+            {children}
+        </OrderedList>
     ),
     [BLOCKS.LIST_ITEM]: (node, children) => <ListItem>{children}</ListItem>,
     [BLOCKS.QUOTE]: (node, children) => (
         <Box
+            key={createUniqueId()}
             as="blockquote"
             borderLeft="4px solid"
             borderColor="gray.200"
@@ -133,6 +121,7 @@ const defaultNodeRenderers: RenderNode = {
         const linkColor = useColorModeValue("gray.900", "gray.50");
         return (
             <Link
+                key={createUniqueId()}
                 fontWeight={700}
                 href={uri as string}
                 color={linkColor}
@@ -145,9 +134,45 @@ const defaultNodeRenderers: RenderNode = {
     },
 };
 
+// Add more types here with | for unions if we ever reference new entries in Rich Text.
+type References =
+    | Queries.LinkWithIconComponentFragment
+    | Queries.ContentfulAsset;
+
+const EmbeddedEntryComponents: { [key: string]: any } = {
+    ContentfulLinkWithIcon: LinkWithIcon,
+};
+
+function renderEntry<T extends CommonNode>(
+    node: T,
+    referenceMap: Map<string, References>,
+) {
+    const entry = referenceMap.get(node.data.target.sys.id);
+    try {
+        if (entry != null) {
+            const { type: componentType } = entry.internal;
+            const Component =
+                EmbeddedEntryComponents[
+                    componentType as keyof typeof EmbeddedEntryComponents
+                ];
+            if (Component) {
+                return <Component key={createUniqueId()} {...entry} />;
+            }
+        }
+    } catch (err) {
+        console.error(
+            "Could not render custom component: ",
+            node.data.target.sys.id,
+            err,
+        );
+    }
+    return <></>;
+}
+
 export function RichText(text: { raw?: any; references?: any }) {
     const { raw, references } = text;
-    const referenceMap = new Map();
+
+    const referenceMap: Map<string, References> = new Map();
     references?.forEach((elem: any) => {
         referenceMap.set(elem.contentful_id, elem);
     });
@@ -163,15 +188,33 @@ export function RichText(text: { raw?: any; references?: any }) {
         },
         renderNode: {
             ...defaultNodeRenderers,
+            [INLINES.EMBEDDED_ENTRY]: (node) => {
+                return renderEntry<typeof node>(node, referenceMap);
+            },
+            [BLOCKS.EMBEDDED_ENTRY]: (node) => {
+                return renderEntry<typeof node>(node, referenceMap);
+            },
             [BLOCKS.EMBEDDED_ASSET]: (node) => {
-                const asset = referenceMap.get(node.data.target.sys.id);
-                return (
-                    <Image
-                        src={asset?.file.url}
-                        alt={asset?.title}
-                        style={{ maxWidth: "100%" }}
-                    />
+                console.log("Embedded Asset: ", node);
+                const asset = referenceMap.get(
+                    node.data.target.sys.id,
+                ) as Queries.ContentfulAsset;
+                if (asset) {
+                    if (asset?.file?.url == null) return <></>;
+                    return (
+                        <Image
+                            key={createUniqueId()}
+                            src={asset.file.url}
+                            alt={asset?.title ?? ""}
+                            style={{ maxWidth: "100%" }}
+                        />
+                    );
+                }
+                console.error(
+                    "Could not find asset with id: ",
+                    node.data.target.sys.id,
                 );
+                return <></>;
             },
         },
     };

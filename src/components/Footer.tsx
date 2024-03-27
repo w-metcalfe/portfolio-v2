@@ -25,6 +25,7 @@ export const Footer = ({
     footer: Queries.FooterComponentFragment;
     context?: ProjectContext;
 }) => {
+    // Function to determine the justifyContent Flex value for the HStack
     function getJustifyContent() {
         if (context) {
             if (context.next != null && context.previous != null) {
@@ -40,11 +41,9 @@ export const Footer = ({
         return "space-between";
     }
 
-    console.log(context);
-
     const { colorMode, toggleColorMode } = useColorMode();
     return (
-        <Box as={"footer"} paddingY={8}>
+        <Box as={"footer"} paddingTop={8} paddingBottom={4}>
             <Stack gap={10}>
                 {context && (
                     <HStack justifyContent={getJustifyContent()}>
